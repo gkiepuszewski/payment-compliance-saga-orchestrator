@@ -1,0 +1,40 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: payment-service
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: jdbc:postgresql://localhost:5433/payment_db
+    username: ${DB_USERNAME:payment}
+    # Password is intentionally absent here: VaultEnvironmentPostProcessor injects
+    # spring.datasource.password at startup by fetching it from the local Vault dev server
+    # (see README > "Secrets management"). No placeholder/default is defined, so if Vault is
+    # unreachable the datasource simply fails to connect with a clear error, rather than silently
+    # falling back to a hard-coded value.
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+app:
+  orchestrator:
+    url: http://localhost:8080/api/sagas/events
+
+outbox:
+  relay:
+    fixed-delay: 2000
+    batch-size: 20
+    max-attempts: 10
+  reaper:
+    fixed-delay: 60000
+
+logging:
+  level:
+    com.gk3.demo: INFO

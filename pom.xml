@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.1</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+
+    <groupId>com.gk3.demo</groupId>
+    <artifactId>payment-compliance-saga-orchestrator</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>payment-compliance-saga-orchestrator</name>
+    <description>
+        Payment + Compliance (AML screening) saga PoC. A custom Java saga orchestrator coordinates two
+        independently deployable Spring Boot microservices (payment-service, compliance-service) over plain
+        REST calls, using the transactional Outbox/Inbox pattern for reliable, idempotent, at-least-once
+        messaging without a broker.
+    </description>
+
+    <modules>
+        <module>common-events</module>
+        <module>payment-service</module>
+        <module>compliance-service</module>
+        <module>orchestrator-service</module>
+    </modules>
+
+    <properties>
+        <java.version>25</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <testcontainers.version>1.21.3</testcontainers.version>
+        <sonar.maven.plugin.version>5.1.0.4751</sonar.maven.plugin.version>
+        <jacoco.maven.plugin.version>0.8.13</jacoco.maven.plugin.version>
+        <sonar.projectKey>payment-compliance-saga-orchestrator</sonar.projectKey>
+        <sonar.projectName>Payment Compliance Saga Orchestrator</sonar.projectName>
+        <sonar.exclusions>**/target/**,**/generated-sources/**</sonar.exclusions>
+        <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+        <sonar.host.url>http://localhost:9000</sonar.host.url>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers-bom</artifactId>
+                <version>${testcontainers.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <!-- In <plugins> (not <pluginManagement>), inherited and bound in every module so
+             `mvn test`/`mvn verify` always records coverage before Sonar analysis reads it. -->
+        <plugins>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.maven.plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>jacoco-prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>jacoco-report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Resolves the mockito-core jar path into a property so it can be loaded as a
+                 static -javaagent below. Without this, Mockito's inline mock maker falls back
+                 to self-attaching at runtime, which some CI environments (e.g. GitHub Actions
+                 Ubuntu runners) block, causing "Could not initialize plugin: MockMaker". -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>resolve-mockito-agent</id>
+                        <phase>generate-test-resources</phase>
+                        <goals>
+                            <goal>properties</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar}</argLine>
+                </configuration>
+            </plugin>
+        </plugins>
+        <pluginManagement>
+            <plugins>
+                <!-- Declared here (parent, not per-module) so `mvn sonar:sonar` run once from
+                     the root aggregates all 4 modules into one Sonar project. -->
+                <plugin>
+                    <groupId>org.sonarsource.scanner.maven</groupId>
+                    <artifactId>sonar-maven-plugin</artifactId>
+                    <version>${sonar.maven.plugin.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+    <profiles>
+        <!-- Opt-in only: `mvn verify -Pe2e -pl e2e-tests -am`. Builds the 3 service Docker images
+             and spins up the whole stack (docker-compose.yml + docker-compose.e2e.yml) through
+             Testcontainers, so it's slow and requires Docker - never runs as part of a plain
+             `mvn test`/`mvn verify`. -->
+        <profile>
+            <id>e2e</id>
+            <modules>
+                <module>e2e-tests</module>
+            </modules>
+        </profile>
+    </profiles>
+
+</project>

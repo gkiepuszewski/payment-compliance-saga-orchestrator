@@ -1,0 +1,172 @@
+version: "3.9"
+
+# Standalone compose file used ONLY by the e2e-tests module (Testcontainers ComposeContainer).
+# Deliberately NOT an override/merge of docker-compose.yml: every service port below is exposed
+# as a bare container port (e.g. "8081", not "8081:8081"), so Docker assigns a random free host
+# port and Testcontainers discovers it at runtime via ComposeContainer#getServicePort(...). This
+# keeps e2e test runs fully isolated from docker-compose.yml's fixed ports (8080/8081/8082/8200),
+# so it never collides with a manually-run local stack (see README > "Running locally").
+#
+# Kept as a full, self-contained copy of docker-compose.yml rather than a merge override: list
+# fields like `ports` don't get *replaced* by override files on older Compose versions (they get
+# merged/appended), which would keep the fixed host ports around. Duplicating the file is a little
+# more to maintain, but far less fragile for a portfolio PoC.
+
+services:
+  vault:
+    image: hashicorp/vault:1.18
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: dev-only-root-token # NOSONAR: see docker-compose.yml
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      VAULT_ADDR: http://127.0.0.1:8200
+    cap_add:
+      - IPC_LOCK
+    ports:
+      - "8200"
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  vault-seed:
+    image: hashicorp/vault:1.18
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: dev-only-root-token # NOSONAR: see docker-compose.yml
+    entrypoint: ["/bin/sh", "/scripts/seed-secrets.sh"]
+    volumes:
+      - ./infra/vault/seed-secrets.sh:/scripts/seed-secrets.sh:ro
+    depends_on:
+      vault:
+        condition: service_healthy
+    restart: "no"
+
+  vault-fetch-passwords:
+    image: hashicorp/vault:1.18
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: dev-only-root-token # NOSONAR: see docker-compose.yml
+    entrypoint: ["/bin/sh", "-c"]
+    # See docker-compose.yml's identical comment: `command` must be a one-item YAML list, not a
+    # plain scalar, so Compose passes the whole script as a single argv entry to `sh -c`.
+    command:
+      - >
+        vault kv get -field=db_password secret/payment-service > /secrets/payment_password &&
+        vault kv get -field=db_password secret/compliance-service > /secrets/compliance_password &&
+        vault kv get -field=db_password secret/orchestrator-service > /secrets/orchestrator_password
+    volumes:
+      - e2e-vault-secrets:/secrets
+    depends_on:
+      vault-seed:
+        condition: service_completed_successfully
+    restart: "no"
+
+  postgres-payment:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: payment_db
+      POSTGRES_USER: payment
+      POSTGRES_PASSWORD_FILE: /run/secrets/payment_password
+    volumes:
+      - e2e-vault-secrets:/run/secrets:ro
+    depends_on:
+      vault-fetch-passwords:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payment -d payment_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-compliance:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: compliance_db
+      POSTGRES_USER: compliance
+      POSTGRES_PASSWORD_FILE: /run/secrets/compliance_password
+    volumes:
+      - e2e-vault-secrets:/run/secrets:ro
+    depends_on:
+      vault-fetch-passwords:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U compliance -d compliance_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-orchestrator:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: orchestrator_db
+      POSTGRES_USER: orchestrator
+      POSTGRES_PASSWORD_FILE: /run/secrets/orchestrator_password
+    volumes:
+      - e2e-vault-secrets:/run/secrets:ro
+    depends_on:
+      vault-fetch-passwords:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orchestrator -d orchestrator_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: payment-service/Dockerfile
+    ports:
+      - "8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-payment:5432/payment_db
+      SPRING_DATASOURCE_USERNAME: payment
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: dev-only-root-token # NOSONAR: see docker-compose.yml
+      APP_ORCHESTRATOR_URL: http://orchestrator-service:8080/api/sagas/events
+    depends_on:
+      postgres-payment:
+        condition: service_healthy
+      vault-seed:
+        condition: service_completed_successfully
+
+  compliance-service:
+    build:
+      context: .
+      dockerfile: compliance-service/Dockerfile
+    ports:
+      - "8082"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-compliance:5432/compliance_db
+      SPRING_DATASOURCE_USERNAME: compliance
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: dev-only-root-token # NOSONAR: see docker-compose.yml
+      APP_ORCHESTRATOR_URL: http://orchestrator-service:8080/api/sagas/events
+    depends_on:
+      postgres-compliance:
+        condition: service_healthy
+      vault-seed:
+        condition: service_completed_successfully
+
+  orchestrator-service:
+    build:
+      context: .
+      dockerfile: orchestrator-service/Dockerfile
+    ports:
+      - "8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-orchestrator:5432/orchestrator_db
+      SPRING_DATASOURCE_USERNAME: orchestrator
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: dev-only-root-token # NOSONAR: see docker-compose.yml
+      APP_PAYMENT_SERVICE_URL: http://payment-service:8081/api/payments/confirmation
+      APP_COMPLIANCE_SERVICE_URL: http://compliance-service:8082/api/compliance/screening
+    depends_on:
+      postgres-orchestrator:
+        condition: service_healthy
+      vault-seed:
+        condition: service_completed_successfully
+
+volumes:
+  e2e-vault-secrets:
