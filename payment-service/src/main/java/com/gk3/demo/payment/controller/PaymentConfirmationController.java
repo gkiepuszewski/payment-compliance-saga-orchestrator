@@ -6,6 +6,7 @@ import com.gk3.demo.payment.inbox.InboxRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -38,10 +39,10 @@ public class PaymentConfirmationController {
             dispatcher.dispatch(envelope);
             inbox.markProcessed();
             return ResponseEntity.ok().build();
-        } catch (DataIntegrityViolationException alreadyReceivedConcurrently) {
+        } catch (DataIntegrityViolationException _) {
             // Lost a race with another delivery of the same messageId; the other request owns processing.
             log.info("Concurrent duplicate delivery of message {} detected, ignoring", envelope.messageId());
-            return ResponseEntity.ok().build();
+            return ResponseEntity.status(HttpStatus.OK).build();
         }
     }
 }

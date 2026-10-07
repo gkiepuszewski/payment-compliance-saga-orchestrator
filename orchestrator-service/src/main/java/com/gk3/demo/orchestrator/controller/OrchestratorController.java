@@ -7,6 +7,7 @@ import com.gk3.demo.orchestrator.inbox.InboxRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -40,9 +41,9 @@ public class OrchestratorController {
             SagaContext.runWithSagaId(envelope.sagaId(), () -> dispatcher.dispatch(envelope));
             inbox.markProcessed();
             return ResponseEntity.ok().build();
-        } catch (DataIntegrityViolationException alreadyReceivedConcurrently) {
+        } catch (DataIntegrityViolationException _) {
             log.info("Concurrent duplicate delivery of message {} detected, ignoring", envelope.messageId());
-            return ResponseEntity.ok().build();
+            return ResponseEntity.status(HttpStatus.OK).build();
         }
     }
 }

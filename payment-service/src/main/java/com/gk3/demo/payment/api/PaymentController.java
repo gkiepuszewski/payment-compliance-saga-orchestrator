@@ -4,11 +4,13 @@ import com.gk3.demo.payment.domain.Payment;
 import com.gk3.demo.payment.domain.PaymentRepository;
 import com.gk3.demo.payment.domain.PaymentService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -40,7 +42,7 @@ public class PaymentController {
     }
 
     @GetMapping
-    public List<PaymentResponse> list() {
-        return paymentRepository.findAll().stream().map(PaymentResponse::from).toList();
+    public Page<PaymentResponse> list(@PageableDefault(size = 20) Pageable pageable) {
+        return paymentRepository.findAll(pageable).map(PaymentResponse::from);
     }
 }

@@ -122,4 +122,8 @@ public class OutboxMessage {
     public Instant getCreatedAt() {
         return createdAt;
     }
+
+    public Instant getSentAt() {
+        return sentAt;
+    }
 }

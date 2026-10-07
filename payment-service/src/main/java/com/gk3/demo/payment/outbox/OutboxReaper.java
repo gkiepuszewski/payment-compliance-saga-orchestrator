@@ -1,6 +1,5 @@
 package com.gk3.demo.payment.outbox;
 
-import com.gk3.demo.payment.config.OutboxReaperProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;

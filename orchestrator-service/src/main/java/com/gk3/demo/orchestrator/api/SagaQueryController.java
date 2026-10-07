@@ -1,13 +1,15 @@
 package com.gk3.demo.orchestrator.api;
 
 import com.gk3.demo.orchestrator.saga.SagaRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -33,7 +35,7 @@ public class SagaQueryController {
     }
 
     @GetMapping
-    public List<SagaResponse> list() {
-        return sagaRepository.findAll().stream().map(SagaResponse::from).toList();
+    public Page<SagaResponse> list(@PageableDefault(size = 20) Pageable pageable) {
+        return sagaRepository.findAll(pageable).map(SagaResponse::from);
     }
 }

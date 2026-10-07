@@ -47,8 +47,9 @@ public class ScreeningService {
         boolean payerSanctioned = isSanctioned(command.payerId());
         boolean payeeSanctioned = isSanctioned(command.payeeId());
         ScreeningDecision decision = (payerSanctioned || payeeSanctioned) ? ScreeningDecision.REJECTED : ScreeningDecision.APPROVED;
+        String matchedParty = payerSanctioned ? command.payerId() : command.payeeId();
         String reason = decision == ScreeningDecision.REJECTED
-                ? "Matched sanctions list: " + (payerSanctioned ? command.payerId() : command.payeeId())
+                ? "Matched sanctions list: " + matchedParty
                 : "No sanctions match";
 
         log.info("Screened payment {}: {} ({})", command.paymentId(), decision, reason);

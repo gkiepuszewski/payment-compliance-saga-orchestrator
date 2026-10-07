@@ -109,7 +109,7 @@ public class SagaOrchestrationService {
     private void log(String message, Object... args) {
         // SagaContext.currentSagaId() is read here purely from the ScopedValue, with no sagaId
         // parameter on this method - demonstrating the propagation JEP 506 scoped values provide.
-        log.info("[{}] " + message, prepend(SagaContext.currentSagaId().orElse(null), args));
+        log.info("[{}] {}", prepend(SagaContext.currentSagaId().orElse(null), args), message);
     }
 
     private static Object[] prepend(Object first, Object[] rest) {
