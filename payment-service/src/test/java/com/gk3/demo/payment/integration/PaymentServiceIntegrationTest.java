@@ -52,8 +52,8 @@ class PaymentServiceIntegrationTest {
     static final WireMockExtension ORCHESTRATOR_STUB = WireMockExtension.newInstance().build();
 
     @DynamicPropertySource
-    static void orchestratorInboxUrl(DynamicPropertyRegistry registry) {
-        registry.add("app.orchestrator.inbox-url", () -> ORCHESTRATOR_STUB.baseUrl() + "/api/inbox");
+    static void orchestratorUrl(DynamicPropertyRegistry registry) {
+        registry.add("app.orchestrator.url", () -> ORCHESTRATOR_STUB.baseUrl() + "/api/sagas/events");
     }
 
     @LocalServerPort
@@ -71,8 +71,8 @@ class PaymentServiceIntegrationTest {
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @BeforeEach
-    void stubOrchestratorInbox() {
-        ORCHESTRATOR_STUB.stubFor(WireMock.post("/api/inbox").willReturn(WireMock.ok()));
+    void stubOrchestrator() {
+        ORCHESTRATOR_STUB.stubFor(WireMock.post("/api/sagas/events").willReturn(WireMock.ok()));
     }
 
     @Test
@@ -95,7 +95,7 @@ class PaymentServiceIntegrationTest {
             assertThat(outboxMessage.getStatus()).isEqualTo(OutboxStatus.SENT);
         });
 
-        ORCHESTRATOR_STUB.verify(1, WireMock.postRequestedFor(WireMock.urlEqualTo("/api/inbox")));
+        ORCHESTRATOR_STUB.verify(1, WireMock.postRequestedFor(WireMock.urlEqualTo("/api/sagas/events")));
     }
 
     @Test
@@ -111,8 +111,8 @@ class PaymentServiceIntegrationTest {
                  "sagaId":"%s","occurredAt":"%s","payload":{"paymentId":"%s"}}
                 """.formatted(messageId, paymentId, Instant.now(), paymentId);
 
-        HttpResponse<String> first = post("/api/inbox", confirmEnvelope);
-        HttpResponse<String> duplicate = post("/api/inbox", confirmEnvelope);
+        HttpResponse<String> first = post("/api/payments/confirmation", confirmEnvelope);
+        HttpResponse<String> duplicate = post("/api/payments/confirmation", confirmEnvelope);
 
         assertThat(first.statusCode()).isEqualTo(200);
         assertThat(duplicate.statusCode()).isEqualTo(200);
@@ -132,7 +132,7 @@ class PaymentServiceIntegrationTest {
                  "sagaId":"%s","occurredAt":"%s","payload":{"paymentId":"%s","reason":"Matched sanctions list: SANCTIONED"}}
                 """.formatted(UUID.randomUUID(), paymentId, Instant.now(), paymentId);
 
-        post("/api/inbox", cancelEnvelope);
+        post("/api/payments/confirmation", cancelEnvelope);
 
         var payment = paymentRepository.findById(paymentId).orElseThrow();
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CANCELLED);

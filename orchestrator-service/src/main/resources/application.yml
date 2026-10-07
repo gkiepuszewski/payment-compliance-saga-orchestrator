@@ -18,9 +18,9 @@ spring:
 
 app:
   payment-service:
-    inbox-url: http://localhost:8081/api/inbox
+    url: http://localhost:8081/api/payments/confirmation
   compliance-service:
-    inbox-url: http://localhost:8082/api/inbox
+    url: http://localhost:8082/api/compliance/screening
 
 outbox:
   relay:

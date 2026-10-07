@@ -56,7 +56,7 @@ public class ScreeningService {
         PaymentScreenedPayload result = new PaymentScreenedPayload(command.paymentId(), decision, reason);
         String payloadJson = writeJson(result);
         outboxRepository.save(OutboxMessage.create(
-                command.paymentId(), EventType.PAYMENT_SCREENED, payloadJson, orchestratorProperties.inboxUrl()));
+                command.paymentId(), EventType.PAYMENT_SCREENED, payloadJson, orchestratorProperties.url()));
     }
 
     private boolean isSanctioned(String partyId) {

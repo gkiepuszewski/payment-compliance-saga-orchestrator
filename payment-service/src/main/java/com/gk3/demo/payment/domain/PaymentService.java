@@ -40,7 +40,7 @@ public class PaymentService {
                 payment.getId(), payment.getPayerId(), payment.getPayeeId(), payment.getAmount(), payment.getCurrency());
         String payloadJson = writeJson(payload);
         outboxRepository.save(OutboxMessage.create(
-                payment.getId(), EventType.PAYMENT_CREATED, payloadJson, orchestratorProperties.inboxUrl()));
+                payment.getId(), EventType.PAYMENT_CREATED, payloadJson, orchestratorProperties.url()));
 
         return payment;
     }

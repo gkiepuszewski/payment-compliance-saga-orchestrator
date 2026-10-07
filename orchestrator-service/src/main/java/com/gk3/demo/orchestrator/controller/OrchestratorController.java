@@ -1,7 +1,9 @@
-package com.gk3.demo.orchestrator.inbox;
+package com.gk3.demo.orchestrator.controller;
 
 import com.gk3.demo.events.EventEnvelope;
 import com.gk3.demo.orchestrator.context.SagaContext;
+import com.gk3.demo.orchestrator.inbox.InboxMessage;
+import com.gk3.demo.orchestrator.inbox.InboxRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -12,19 +14,19 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-public class OrchestratorInboxController {
+public class OrchestratorController {
 
-    private static final Logger log = LoggerFactory.getLogger(OrchestratorInboxController.class);
+    private static final Logger log = LoggerFactory.getLogger(OrchestratorController.class);
 
     private final InboxRepository inboxRepository;
-    private final OrchestratorInboxDispatcher dispatcher;
+    private final OrchestratorDispatcher dispatcher;
 
-    public OrchestratorInboxController(InboxRepository inboxRepository, OrchestratorInboxDispatcher dispatcher) {
+    public OrchestratorController(InboxRepository inboxRepository, OrchestratorDispatcher dispatcher) {
         this.inboxRepository = inboxRepository;
         this.dispatcher = dispatcher;
     }
 
-    @PostMapping("/api/inbox")
+    @PostMapping("/api/sagas/events")
     @Transactional
     public ResponseEntity<Void> receive(@RequestBody EventEnvelope envelope) {
         if (inboxRepository.existsById(envelope.messageId())) {

@@ -1,5 +1,7 @@
-package com.gk3.demo.payment.inbox;
+package com.gk3.demo.compliance.controller;
 
+import com.gk3.demo.compliance.inbox.InboxMessage;
+import com.gk3.demo.compliance.inbox.InboxRepository;
 import com.gk3.demo.events.EventEnvelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,19 +13,19 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-public class PaymentInboxController {
+public class ComplianceController {
 
-    private static final Logger log = LoggerFactory.getLogger(PaymentInboxController.class);
+    private static final Logger log = LoggerFactory.getLogger(ComplianceController.class);
 
     private final InboxRepository inboxRepository;
-    private final PaymentInboxDispatcher dispatcher;
+    private final ComplianceDispatcher dispatcher;
 
-    public PaymentInboxController(InboxRepository inboxRepository, PaymentInboxDispatcher dispatcher) {
+    public ComplianceController(InboxRepository inboxRepository, ComplianceDispatcher dispatcher) {
         this.inboxRepository = inboxRepository;
         this.dispatcher = dispatcher;
     }
 
-    @PostMapping("/api/inbox")
+    @PostMapping("/api/compliance/screening")
     @Transactional
     public ResponseEntity<Void> receive(@RequestBody EventEnvelope envelope) {
         if (inboxRepository.existsById(envelope.messageId())) {
@@ -37,7 +39,6 @@ public class PaymentInboxController {
             inbox.markProcessed();
             return ResponseEntity.ok().build();
         } catch (DataIntegrityViolationException alreadyReceivedConcurrently) {
-            // Lost a race with another delivery of the same messageId; the other request owns processing.
             log.info("Concurrent duplicate delivery of message {} detected, ignoring", envelope.messageId());
             return ResponseEntity.ok().build();
         }

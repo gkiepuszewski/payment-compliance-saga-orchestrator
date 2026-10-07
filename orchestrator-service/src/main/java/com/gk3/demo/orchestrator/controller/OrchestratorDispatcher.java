@@ -1,4 +1,4 @@
-package com.gk3.demo.orchestrator.inbox;
+package com.gk3.demo.orchestrator.controller;
 
 import tools.jackson.databind.ObjectMapper;
 import com.gk3.demo.events.EventEnvelope;
@@ -8,12 +8,12 @@ import com.gk3.demo.orchestrator.saga.SagaOrchestrationService;
 import org.springframework.stereotype.Component;
 
 @Component
-public class OrchestratorInboxDispatcher {
+public class OrchestratorDispatcher {
 
     private final SagaOrchestrationService sagaOrchestrationService;
     private final ObjectMapper objectMapper;
 
-    public OrchestratorInboxDispatcher(SagaOrchestrationService sagaOrchestrationService, ObjectMapper objectMapper) {
+    public OrchestratorDispatcher(SagaOrchestrationService sagaOrchestrationService, ObjectMapper objectMapper) {
         this.sagaOrchestrationService = sagaOrchestrationService;
         this.objectMapper = objectMapper;
     }

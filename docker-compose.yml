@@ -54,7 +54,7 @@ services:
       - "8081:8081"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-payment:5432/payment_db
-      APP_ORCHESTRATOR_INBOX_URL: http://orchestrator-service:8080/api/inbox
+      APP_ORCHESTRATOR_INBOX_URL: http://orchestrator-service:8080/api/sagas/events
     depends_on:
       postgres-payment:
         condition: service_healthy
@@ -67,7 +67,7 @@ services:
       - "8082:8082"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-compliance:5432/compliance_db
-      APP_ORCHESTRATOR_INBOX_URL: http://orchestrator-service:8080/api/inbox
+      APP_ORCHESTRATOR_INBOX_URL: http://orchestrator-service:8080/api/sagas/events
     depends_on:
       postgres-compliance:
         condition: service_healthy
@@ -80,8 +80,8 @@ services:
       - "8080:8080"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-orchestrator:5432/orchestrator_db
-      APP_PAYMENT_SERVICE_INBOX_URL: http://payment-service:8081/api/inbox
-      APP_COMPLIANCE_SERVICE_INBOX_URL: http://compliance-service:8082/api/inbox
+      APP_PAYMENT_SERVICE_INBOX_URL: http://payment-service:8081/api/payments/confirmation
+      APP_COMPLIANCE_SERVICE_INBOX_URL: http://compliance-service:8082/api/compliance/screening
     depends_on:
       postgres-orchestrator:
         condition: service_healthy

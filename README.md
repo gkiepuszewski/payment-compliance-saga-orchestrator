@@ -36,25 +36,30 @@ infra/terraform/        Spins up 3 local PostgreSQL containers via the Docker pr
      -> Payment saved as PENDING
      -> PaymentCreated event written to payment-service's outbox (same local transaction)
 
-2. OutboxRelay (payment-service) delivers PaymentCreated -> orchestrator-service /api/inbox
+2. OutboxRelay (payment-service) delivers PaymentCreated -> orchestrator-service /api/sagas/events
      -> orchestrator starts a SagaInstance (STARTED -> AWAITING_SCREENING)
      -> ScreenPaymentCommand written to orchestrator's outbox
 
-3. OutboxRelay (orchestrator-service) delivers ScreenPaymentCommand -> compliance-service /api/inbox
+3. OutboxRelay (orchestrator-service) delivers ScreenPaymentCommand -> compliance-service /api/compliance/screening
      -> compliance-service screens payer/payee against a configured sanctions list
      -> PaymentScreened (APPROVED | REJECTED) written to compliance-service's outbox
 
-4. OutboxRelay (compliance-service) delivers PaymentScreened -> orchestrator-service /api/inbox
+4. OutboxRelay (compliance-service) delivers PaymentScreened -> orchestrator-service /api/sagas/events
      -> APPROVED: saga COMPLETED, ConfirmPaymentCommand enqueued
      -> REJECTED: saga COMPENSATED, CancelPaymentCommand enqueued (the saga's compensating action)
 
-5. OutboxRelay (orchestrator-service) delivers Confirm/CancelPaymentCommand -> payment-service /api/inbox
+5. OutboxRelay (orchestrator-service) delivers Confirm/CancelPaymentCommand -> payment-service /api/payments/confirmation
      -> Payment transitions PENDING -> CONFIRMED or PENDING -> CANCELLED
 ```
 
-Every hop is an HTTP POST to `/api/inbox` carrying an `EventEnvelope { messageId, type, sagaId,
-sourceService, occurredAt, payload }`. The receiving Inbox persists `messageId` before processing,
-so redelivery after a timeout/5xx is always safe to retry.
+Every hop is an HTTP POST carrying an `EventEnvelope { messageId, type, sagaId,
+sourceService, occurredAt, payload }` to the receiving service's Inbox endpoint. Each service
+exposes a single, domain-meaningful path rather than a generic `/api/inbox`, so the HTTP contract
+reads as "what does this service do" rather than leaking the Inbox pattern name: `/api/sagas/events`
+(orchestrator-service, receives PaymentCreated/PaymentScreened), `/api/compliance/screening`
+(compliance-service, receives ScreenPaymentCommand), `/api/payments/confirmation` (payment-service,
+receives the saga's final Confirm/Cancel decision). The receiving Inbox persists `messageId` before
+processing, so redelivery after a timeout/5xx is always safe to retry.
 
 ## Reliable messaging: Outbox/Inbox, not a broker
 
@@ -69,7 +74,7 @@ so redelivery after a timeout/5xx is always safe to retry.
 
 ## JDK 25 features in `orchestrator-service`
 
-- `spring.threads.virtual.enabled=true` — Tomcat handles each `/api/inbox` request on a virtual thread.
+- `spring.threads.virtual.enabled=true` — Tomcat handles each `/api/sagas/events` request on a virtual thread.
 - `com.gk3.demo.orchestrator.context.SagaContext` wraps a `ScopedValue<UUID>` bound for the whole
   processing of an inbound message (`SagaContext.runWithSagaId(sagaId, () -> dispatcher.dispatch(...))`).
   Deep in the call graph, `SagaOrchestrationService` reads the current saga id back out with

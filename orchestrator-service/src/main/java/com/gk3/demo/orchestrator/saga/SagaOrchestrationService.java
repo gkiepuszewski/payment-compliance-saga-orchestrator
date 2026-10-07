@@ -59,7 +59,7 @@ public class SagaOrchestrationService {
 
         ScreenPaymentCommandPayload command = new ScreenPaymentCommandPayload(
                 payment.paymentId(), payment.payerId(), payment.payeeId(), payment.amount(), payment.currency());
-        enqueue(payment.paymentId(), EventType.SCREEN_PAYMENT_COMMAND, command, complianceServiceProperties.inboxUrl());
+        enqueue(payment.paymentId(), EventType.SCREEN_PAYMENT_COMMAND, command, complianceServiceProperties.url());
 
         log("Saga started, requested AML screening for payment {}", payment.paymentId());
     }
@@ -81,13 +81,13 @@ public class SagaOrchestrationService {
             case APPROVED -> {
                 saga.complete();
                 enqueue(screening.paymentId(), EventType.CONFIRM_PAYMENT_COMMAND,
-                        new ConfirmPaymentCommandPayload(screening.paymentId()), paymentServiceProperties.inboxUrl());
+                        new ConfirmPaymentCommandPayload(screening.paymentId()), paymentServiceProperties.url());
                 log("Screening APPROVED for payment {}, confirming payment", screening.paymentId());
             }
             case REJECTED -> {
                 saga.compensate(screening.reason());
                 enqueue(screening.paymentId(), EventType.CANCEL_PAYMENT_COMMAND,
-                        new CancelPaymentCommandPayload(screening.paymentId(), screening.reason()), paymentServiceProperties.inboxUrl());
+                        new CancelPaymentCommandPayload(screening.paymentId(), screening.reason()), paymentServiceProperties.url());
                 log("Screening REJECTED for payment {} ({}), compensating: cancelling payment",
                         screening.paymentId(), screening.reason());
             }

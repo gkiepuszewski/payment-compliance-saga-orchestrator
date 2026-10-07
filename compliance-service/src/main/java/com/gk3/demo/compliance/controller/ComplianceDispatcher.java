@@ -1,4 +1,4 @@
-package com.gk3.demo.compliance.inbox;
+package com.gk3.demo.compliance.controller;
 
 import tools.jackson.databind.ObjectMapper;
 import com.gk3.demo.compliance.screening.ScreeningService;
@@ -7,12 +7,12 @@ import com.gk3.demo.events.payload.ScreenPaymentCommandPayload;
 import org.springframework.stereotype.Component;
 
 @Component
-public class ComplianceInboxDispatcher {
+public class ComplianceDispatcher {
 
     private final ScreeningService screeningService;
     private final ObjectMapper objectMapper;
 
-    public ComplianceInboxDispatcher(ScreeningService screeningService, ObjectMapper objectMapper) {
+    public ComplianceDispatcher(ScreeningService screeningService, ObjectMapper objectMapper) {
         this.screeningService = screeningService;
         this.objectMapper = objectMapper;
     }

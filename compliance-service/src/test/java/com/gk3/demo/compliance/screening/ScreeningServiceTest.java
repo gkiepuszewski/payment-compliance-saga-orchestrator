@@ -25,7 +25,7 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 class ScreeningServiceTest {
 
-    private static final String ORCHESTRATOR_INBOX_URL = "http://orchestrator:8080/api/inbox";
+    private static final String ORCHESTRATOR_URL = "http://orchestrator:8080/api/sagas/events";
 
     @Mock
     private OutboxRepository outboxRepository;
@@ -35,7 +35,7 @@ class ScreeningServiceTest {
     @BeforeEach
     void setUp() {
         ObjectMapper objectMapper = JsonMapper.builder().build();
-        OrchestratorProperties orchestratorProperties = new OrchestratorProperties(ORCHESTRATOR_INBOX_URL);
+        OrchestratorProperties orchestratorProperties = new OrchestratorProperties(ORCHESTRATOR_URL);
         ScreeningProperties screeningProperties = new ScreeningProperties(List.of("SANCTIONED", "BLOCKED-PARTY", "OFAC-TEST"));
         screeningService = new ScreeningService(outboxRepository, orchestratorProperties, screeningProperties, objectMapper);
     }
@@ -94,7 +94,7 @@ class ScreeningServiceTest {
 
         screeningService.screen(command);
 
-        assertThat(captureOutboxMessage().getTargetUrl()).isEqualTo(ORCHESTRATOR_INBOX_URL);
+        assertThat(captureOutboxMessage().getTargetUrl()).isEqualTo(ORCHESTRATOR_URL);
     }
 
     private OutboxMessage captureOutboxMessage() {

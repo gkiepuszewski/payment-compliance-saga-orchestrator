@@ -26,7 +26,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class PaymentServiceTest {
 
-    private static final String ORCHESTRATOR_INBOX_URL = "http://orchestrator:8080/api/inbox";
+    private static final String ORCHESTRATOR_INBOX_URL = "http://orchestrator:8080/api/sagas/events";
 
     @Mock
     private PaymentRepository paymentRepository;

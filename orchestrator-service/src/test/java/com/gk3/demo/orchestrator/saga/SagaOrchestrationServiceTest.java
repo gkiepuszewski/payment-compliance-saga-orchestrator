@@ -30,8 +30,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class SagaOrchestrationServiceTest {
 
-    private static final String PAYMENT_INBOX_URL = "http://payment-service:8081/api/inbox";
-    private static final String COMPLIANCE_INBOX_URL = "http://compliance-service:8082/api/inbox";
+    private static final String PAYMENT_INBOX_URL = "http://payment-service:8081/api/payments/confirmation";
+    private static final String COMPLIANCE_INBOX_URL = "http://compliance-service:8082/api/compliance/screening";
 
     @Mock
     private SagaRepository sagaRepository;

@@ -1,4 +1,4 @@
-package com.gk3.demo.payment.inbox;
+package com.gk3.demo.payment.controller;
 
 import tools.jackson.databind.ObjectMapper;
 import com.gk3.demo.events.EventEnvelope;
@@ -8,12 +8,12 @@ import com.gk3.demo.payment.domain.PaymentService;
 import org.springframework.stereotype.Component;
 
 @Component
-public class PaymentInboxDispatcher {
+public class PaymentConfirmationDispatcher {
 
     private final PaymentService paymentService;
     private final ObjectMapper objectMapper;
 
-    public PaymentInboxDispatcher(PaymentService paymentService, ObjectMapper objectMapper) {
+    public PaymentConfirmationDispatcher(PaymentService paymentService, ObjectMapper objectMapper) {
         this.paymentService = paymentService;
         this.objectMapper = objectMapper;
     }
