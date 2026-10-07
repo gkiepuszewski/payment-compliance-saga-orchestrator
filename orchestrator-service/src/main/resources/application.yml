@@ -1,0 +1,35 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: orchestrator-service
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: jdbc:postgresql://localhost:5435/orchestrator_db
+    username: orchestrator
+    password: orchestrator
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
+app:
+  payment-service:
+    inbox-url: http://localhost:8081/api/inbox
+  compliance-service:
+    inbox-url: http://localhost:8082/api/inbox
+
+outbox:
+  relay:
+    fixed-delay: 2000
+    batch-size: 20
+    max-attempts: 10
+
+logging:
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %-5level [%X{sagaId}] %logger{36} - %msg%n"
+  level:
+    com.gk3.demo: INFO

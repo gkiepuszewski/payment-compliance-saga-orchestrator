@@ -1,0 +1,36 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: compliance-service
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: jdbc:postgresql://localhost:5434/compliance_db
+    username: compliance
+    password: compliance
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
+app:
+  orchestrator:
+    inbox-url: http://localhost:8080/api/inbox
+
+outbox:
+  relay:
+    fixed-delay: 2000
+    batch-size: 20
+    max-attempts: 10
+
+compliance:
+  # Toy sanctions list used to simulate an AML/sanctions screening provider. Any payer/payee id
+  # matching one of these (case-insensitive) is REJECTED; everything else is APPROVED.
+  sanctioned-parties: SANCTIONED,BLOCKED-PARTY,OFAC-TEST
+
+logging:
+  level:
+    com.gk3.demo: INFO
