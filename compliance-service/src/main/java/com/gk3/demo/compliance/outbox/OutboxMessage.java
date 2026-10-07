@@ -80,6 +80,17 @@ public class OutboxMessage {
         }
     }
 
+    /**
+     * Re-queues a {@code FAILED} row for another delivery attempt (e.g. after an operator has
+     * confirmed/fixed whatever caused it to exhaust its attempts). Resets the attempt counter so
+     * it gets the full {@code maxAttempts} budget again.
+     */
+    public void resetForRetry() {
+        this.status = OutboxStatus.PENDING;
+        this.attempts = 0;
+        this.lastError = null;
+    }
+
     public UUID getId() {
         return id;
     }
@@ -106,5 +117,13 @@ public class OutboxMessage {
 
     public int getAttempts() {
         return attempts;
+    }
+
+    public String getLastError() {
+        return lastError;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
     }
 }

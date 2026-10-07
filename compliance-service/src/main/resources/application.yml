@@ -13,7 +13,7 @@ spring:
     password: compliance
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     open-in-view: false
 
 app:
@@ -25,6 +25,8 @@ outbox:
     fixed-delay: 2000
     batch-size: 20
     max-attempts: 10
+  reaper:
+    fixed-delay: 60000
 
 compliance:
   # Toy sanctions list used to simulate an AML/sanctions screening provider. Any payer/payee id

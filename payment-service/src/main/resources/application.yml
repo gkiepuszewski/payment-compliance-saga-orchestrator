@@ -13,7 +13,7 @@ spring:
     password: payment
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     open-in-view: false
     properties:
       hibernate:
@@ -28,6 +28,8 @@ outbox:
     fixed-delay: 2000
     batch-size: 20
     max-attempts: 10
+  reaper:
+    fixed-delay: 60000
 
 logging:
   level:

@@ -11,6 +11,8 @@ public interface OutboxRepository extends JpaRepository<OutboxMessage, UUID> {
 
     List<OutboxMessage> findByStatusOrderByCreatedAtAsc(OutboxStatus status, Pageable pageable);
 
+    List<OutboxMessage> findByStatus(OutboxStatus status);
+
     default List<OutboxMessage> findBatchOfPending(int batchSize) {
         return findByStatusOrderByCreatedAtAsc(OutboxStatus.PENDING, PageRequest.of(0, batchSize));
     }
