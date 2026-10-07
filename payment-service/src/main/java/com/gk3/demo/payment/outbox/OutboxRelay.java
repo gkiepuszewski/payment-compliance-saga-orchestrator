@@ -65,9 +65,11 @@ public class OutboxRelay {
                     .retrieve()
                     .toBodilessEntity();
             message.markSent();
+            outboxRepository.save(message);
             log.info("Delivered outbox message {} ({}) to {}", message.getId(), message.getEventType(), message.getTargetUrl());
         } catch (Exception ex) {
             message.markFailedAttempt(ex.getMessage(), properties.maxAttempts());
+            outboxRepository.save(message);
             log.warn("Failed to deliver outbox message {} ({}), attempt {}: {}",
                     message.getId(), message.getEventType(), message.getAttempts(), ex.getMessage());
         }

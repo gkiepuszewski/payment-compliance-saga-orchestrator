@@ -1,0 +1,10 @@
+target/
+*/target/
+.git/
+.idea/
+*.iml
+.terraform/
+infra/terraform/.terraform/
+infra/terraform/terraform.tfstate*
+*.md
+!README.md

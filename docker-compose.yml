@@ -1,0 +1,87 @@
+version: "3.9"
+
+# Full local stack: 3 Postgres databases + the 3 Spring Boot services, built from the
+# Dockerfiles in each module. Useful for a quick manual end-to-end run and reused by the
+# e2e-tests module (Testcontainers ComposeContainer) for black-box saga tests.
+#
+#   docker compose up --build
+#
+# Then: curl -X POST localhost:8081/api/payments -H "Content-Type: application/json" \
+#   -d '{"payerId":"alice","payeeId":"bob","amount":100,"currency":"EUR"}'
+
+services:
+  postgres-payment:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: payment_db
+      POSTGRES_USER: payment
+      POSTGRES_PASSWORD: payment
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payment -d payment_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-compliance:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: compliance_db
+      POSTGRES_USER: compliance
+      POSTGRES_PASSWORD: compliance
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U compliance -d compliance_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-orchestrator:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: orchestrator_db
+      POSTGRES_USER: orchestrator
+      POSTGRES_PASSWORD: orchestrator
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orchestrator -d orchestrator_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: payment-service/Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-payment:5432/payment_db
+      APP_ORCHESTRATOR_INBOX_URL: http://orchestrator-service:8080/api/inbox
+    depends_on:
+      postgres-payment:
+        condition: service_healthy
+
+  compliance-service:
+    build:
+      context: .
+      dockerfile: compliance-service/Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-compliance:5432/compliance_db
+      APP_ORCHESTRATOR_INBOX_URL: http://orchestrator-service:8080/api/inbox
+    depends_on:
+      postgres-compliance:
+        condition: service_healthy
+
+  orchestrator-service:
+    build:
+      context: .
+      dockerfile: orchestrator-service/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-orchestrator:5432/orchestrator_db
+      APP_PAYMENT_SERVICE_INBOX_URL: http://payment-service:8081/api/inbox
+      APP_COMPLIANCE_SERVICE_INBOX_URL: http://compliance-service:8082/api/inbox
+    depends_on:
+      postgres-orchestrator:
+        condition: service_healthy
