@@ -1,41 +1,39 @@
 version: "3.9"
 
-# Full local stack: 3 Postgres databases + the 3 Spring Boot services, built from the
-# Dockerfiles in each module. Useful for a quick manual end-to-end run, with fixed host ports for
-# convenience. The e2e-tests module uses a separate, port-isolated docker-compose.e2e.yml instead
-# (see that file's header comment for why) so automated e2e runs never collide with this one.
+# Standalone compose file used ONLY by the e2e-tests module (Testcontainers ComposeContainer).
+# Deliberately NOT an override/merge of docker-compose.yml: every service port below is exposed
+# as a bare container port (e.g. "8081", not "8081:8081"), so Docker assigns a random free host
+# port and Testcontainers discovers it at runtime via ComposeContainer#getServicePort(...). This
+# keeps e2e test runs fully isolated from docker-compose.yml's fixed ports (8080/8081/8082/8200),
+# so it never collides with a manually-run local stack (see README > "Running locally").
 #
-#   docker compose up --build
-#
-# Then: curl -X POST localhost:8081/api/payments -H "Content-Type: application/json" \
-#   -d '{"payerId":"alice","payeeId":"bob","amount":100,"currency":"EUR"}'
+# Kept as a full, self-contained copy of docker-compose.yml rather than a merge override: list
+# fields like `ports` don't get *replaced* by override files on older Compose versions (they get
+# merged/appended), which would keep the fixed host ports around. Duplicating the file is a little
+# more to maintain, but far less fragile for a portfolio PoC.
 
 services:
-  # Ephemeral, in-memory Vault dev server: the single source of truth for every DB password used
-  # below (Postgres bootstrap + each Spring service's own datasource password). Wiped on every
-  # restart, never reachable outside this compose network - see README > "Secrets management".
   vault:
     image: hashicorp/vault:1.18
     environment:
-      VAULT_DEV_ROOT_TOKEN_ID: dev-only-root-token # NOSONAR: fixed root token for the local, ephemeral `vault -dev` server only - see README > "Secrets management"
+      VAULT_DEV_ROOT_TOKEN_ID: dev-only-root-token # NOSONAR: see docker-compose.yml
       VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
-      VAULT_ADDR: http://127.0.0.1:8200 # needed so the `vault status` healthcheck's CLI call below doesn't default to https
+      VAULT_ADDR: http://127.0.0.1:8200
     cap_add:
       - IPC_LOCK
     ports:
-      - "8200:8200"
+      - "8200"
     healthcheck:
       test: ["CMD", "vault", "status"]
       interval: 5s
       timeout: 5s
       retries: 10
 
-  # One-shot: seeds the demo DB passwords into Vault. Safe to commit (see infra/vault/seed-secrets.sh).
   vault-seed:
     image: hashicorp/vault:1.18
     environment:
       VAULT_ADDR: http://vault:8200
-      VAULT_TOKEN: dev-only-root-token # NOSONAR: see vault service above
+      VAULT_TOKEN: dev-only-root-token # NOSONAR: see docker-compose.yml
     entrypoint: ["/bin/sh", "/scripts/seed-secrets.sh"]
     volumes:
       - ./infra/vault/seed-secrets.sh:/scripts/seed-secrets.sh:ro
@@ -44,21 +42,18 @@ services:
         condition: service_healthy
     restart: "no"
 
-  # One-shot: reads each service's DB password back out of Vault and writes it to a shared,
-  # read-only volume, so the postgres-* containers below can bootstrap via POSTGRES_PASSWORD_FILE
-  # without ever having the password passed as a plain environment variable or baked into this file.
   vault-fetch-passwords:
     image: hashicorp/vault:1.18
     environment:
       VAULT_ADDR: http://vault:8200
-      VAULT_TOKEN: dev-only-root-token # NOSONAR: see vault service above
+      VAULT_TOKEN: dev-only-root-token # NOSONAR: see docker-compose.yml
     entrypoint: ["/bin/sh", "-c"]
     command: >
       vault kv get -field=db_password secret/payment-service > /secrets/payment_password &&
       vault kv get -field=db_password secret/compliance-service > /secrets/compliance_password &&
       vault kv get -field=db_password secret/orchestrator-service > /secrets/orchestrator_password
     volumes:
-      - vault-secrets:/secrets
+      - e2e-vault-secrets:/secrets
     depends_on:
       vault-seed:
         condition: service_completed_successfully
@@ -71,7 +66,7 @@ services:
       POSTGRES_USER: payment
       POSTGRES_PASSWORD_FILE: /run/secrets/payment_password
     volumes:
-      - vault-secrets:/run/secrets:ro
+      - e2e-vault-secrets:/run/secrets:ro
     depends_on:
       vault-fetch-passwords:
         condition: service_completed_successfully
@@ -88,7 +83,7 @@ services:
       POSTGRES_USER: compliance
       POSTGRES_PASSWORD_FILE: /run/secrets/compliance_password
     volumes:
-      - vault-secrets:/run/secrets:ro
+      - e2e-vault-secrets:/run/secrets:ro
     depends_on:
       vault-fetch-passwords:
         condition: service_completed_successfully
@@ -105,7 +100,7 @@ services:
       POSTGRES_USER: orchestrator
       POSTGRES_PASSWORD_FILE: /run/secrets/orchestrator_password
     volumes:
-      - vault-secrets:/run/secrets:ro
+      - e2e-vault-secrets:/run/secrets:ro
     depends_on:
       vault-fetch-passwords:
         condition: service_completed_successfully
@@ -120,12 +115,12 @@ services:
       context: .
       dockerfile: payment-service/Dockerfile
     ports:
-      - "8081:8081"
+      - "8081"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-payment:5432/payment_db
       SPRING_DATASOURCE_USERNAME: payment
       VAULT_ADDR: http://vault:8200
-      VAULT_TOKEN: dev-only-root-token # NOSONAR: see vault service above
+      VAULT_TOKEN: dev-only-root-token # NOSONAR: see docker-compose.yml
       APP_ORCHESTRATOR_URL: http://orchestrator-service:8080/api/sagas/events
     depends_on:
       postgres-payment:
@@ -138,12 +133,12 @@ services:
       context: .
       dockerfile: compliance-service/Dockerfile
     ports:
-      - "8082:8082"
+      - "8082"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-compliance:5432/compliance_db
       SPRING_DATASOURCE_USERNAME: compliance
       VAULT_ADDR: http://vault:8200
-      VAULT_TOKEN: dev-only-root-token # NOSONAR: see vault service above
+      VAULT_TOKEN: dev-only-root-token # NOSONAR: see docker-compose.yml
       APP_ORCHESTRATOR_URL: http://orchestrator-service:8080/api/sagas/events
     depends_on:
       postgres-compliance:
@@ -156,12 +151,12 @@ services:
       context: .
       dockerfile: orchestrator-service/Dockerfile
     ports:
-      - "8080:8080"
+      - "8080"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-orchestrator:5432/orchestrator_db
       SPRING_DATASOURCE_USERNAME: orchestrator
       VAULT_ADDR: http://vault:8200
-      VAULT_TOKEN: dev-only-root-token # NOSONAR: see vault service above
+      VAULT_TOKEN: dev-only-root-token # NOSONAR: see docker-compose.yml
       APP_PAYMENT_SERVICE_URL: http://payment-service:8081/api/payments/confirmation
       APP_COMPLIANCE_SERVICE_URL: http://compliance-service:8082/api/compliance/screening
     depends_on:
@@ -171,4 +166,4 @@ services:
         condition: service_completed_successfully
 
 volumes:
-  vault-secrets:
+  e2e-vault-secrets:

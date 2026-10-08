@@ -92,4 +92,17 @@
         </pluginManagement>
     </build>
 
+    <profiles>
+        <!-- Opt-in only: `mvn verify -Pe2e -pl e2e-tests -am`. Builds the 3 service Docker images
+             and spins up the whole stack (docker-compose.yml + docker-compose.e2e.yml) through
+             Testcontainers, so it's slow and requires Docker - never runs as part of a plain
+             `mvn test`/`mvn verify`. -->
+        <profile>
+            <id>e2e</id>
+            <modules>
+                <module>e2e-tests</module>
+            </modules>
+        </profile>
+    </profiles>
+
 </project>

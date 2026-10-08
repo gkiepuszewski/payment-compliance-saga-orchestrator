@@ -180,9 +180,26 @@ Invoke-RestMethod "http://localhost:8080/api/sagas/$($p.id)"      # state: COMPE
 cd infra/terraform && terraform destroy -auto-approve
 ```
 
+## End-to-end tests
+
+The `e2e-tests` module automates the "Try it" walkthrough above as a genuine black-box test: it
+builds the 3 services' Docker images and spins up the whole stack (3 Postgres DBs, Vault, and the
+3 services) via Testcontainers' `ComposeContainer`, using a dedicated `docker-compose.e2e.yml`
+with randomized host ports (so it never collides with a manually-run stack from the section
+above). It then drives the saga purely through `payment-service`'s and `orchestrator-service`'s
+public REST APIs - no mocks, no direct DB access - for both the happy path and the compensation
+path, polling with Awaitility instead of a fixed sleep.
+
+It's opt-in (requires Docker, takes a few minutes to build images) and does **not** run as part of
+a plain `mvn test`/`mvn verify`:
+
+```bash
+mvn verify -Pe2e -pl e2e-tests -am
+```
+
 ## Possible follow-ups (not implemented, out of scope for this PoC)
 
 - Flyway/Liquibase migrations instead of `hibernate.ddl-auto=update`.
 - A scheduled reaper to alert/replay `FAILED` outbox rows.
-- Containerizing the three services themselves (Dockerfiles) + a Kubernetes manifest, to show the
-  orchestrator running unchanged outside this Terraform/local-JVM setup.
+- A Kubernetes manifest for the 3 services' existing Dockerfiles, to show the orchestrator running
+  unchanged outside this Terraform/local-JVM setup.
