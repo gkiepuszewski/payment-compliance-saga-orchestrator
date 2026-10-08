@@ -35,6 +35,12 @@ class PaymentComplianceSagaE2ETest {
 
     @Container
     static final ComposeContainer COMPOSE = new ComposeContainer(new File("../docker-compose.e2e.yml"))
+            // Use the host's own `docker compose` CLI instead of Testcontainers' fallback of
+            // running compose inside a `docker:24.0.2` container - that fallback needs extra
+            // Docker-in-Docker socket/privileged setup that isn't available in every environment
+            // and is what was failing here. Requires `docker compose` (v2 plugin) on the PATH of
+            // whatever shell runs Maven.
+            .withLocalCompose(true)
             .withExposedService("payment-service", 8081,
                     Wait.forLogMessage(".*Started PaymentServiceApplication.*\\n", 1)
                             .withStartupTimeout(Duration.ofMinutes(3)))
