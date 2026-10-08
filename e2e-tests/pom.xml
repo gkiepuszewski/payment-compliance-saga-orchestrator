@@ -53,6 +53,14 @@
             <version>4.3.0</version>
             <scope>test</scope>
         </dependency>
+        <!-- Without an SLF4J binding, Testcontainers silently swallows the `docker compose up`
+             process output on failure (just "exited abnormally with code 1", no details). -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>2.0.17</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
