@@ -48,10 +48,13 @@ services:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: dev-only-root-token # NOSONAR: see docker-compose.yml
     entrypoint: ["/bin/sh", "-c"]
-    command: >
-      vault kv get -field=db_password secret/payment-service > /secrets/payment_password &&
-      vault kv get -field=db_password secret/compliance-service > /secrets/compliance_password &&
-      vault kv get -field=db_password secret/orchestrator-service > /secrets/orchestrator_password
+    # See docker-compose.yml's identical comment: `command` must be a one-item YAML list, not a
+    # plain scalar, so Compose passes the whole script as a single argv entry to `sh -c`.
+    command:
+      - >
+        vault kv get -field=db_password secret/payment-service > /secrets/payment_password &&
+        vault kv get -field=db_password secret/compliance-service > /secrets/compliance_password &&
+        vault kv get -field=db_password secret/orchestrator-service > /secrets/orchestrator_password
     volumes:
       - e2e-vault-secrets:/secrets
     depends_on:
