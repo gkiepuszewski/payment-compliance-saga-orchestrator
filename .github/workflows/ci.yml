@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Unit & integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - name: Make mvnw executable
+        # Tracked as a plain (non-executable) file in git - this repo's main development happens
+        # on Windows, which has no exec bit concept, so `chmod` here instead of relying on git.
+        run: chmod +x mvnw
+
+      - name: mvn test
+        # Runs unit tests in every module plus payment-service's Testcontainers-based
+        # PaymentServiceIntegrationTest (black-box, real Postgres + WireMock) - but NOT the
+        # e2e-tests module, which is opt-in only via the "e2e" profile (see the e2e job below).
+        run: ./mvnw -B test
+
+  e2e:
+    name: End-to-end saga tests
+    needs: test
+    # Only on pushes to main (not on pull_request, including from forks) - it builds 3 Docker
+    # images and runs the whole local stack, so it's slower/heavier than the unit/integration job
+    # above and isn't worth running on every PR push.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - name: Make mvnw executable
+        run: chmod +x mvnw
+
+      - name: mvn verify -Pe2e
+        run: ./mvnw -B verify -Pe2e -pl e2e-tests -am

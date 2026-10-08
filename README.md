@@ -197,6 +197,15 @@ a plain `mvn test`/`mvn verify`:
 mvn verify -Pe2e -pl e2e-tests -am
 ```
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push/PR to `main`, as two separate jobs/status checks:
+
+- **`test`** - `mvn test` (unit tests + `PaymentServiceIntegrationTest`'s Testcontainers-based
+  integration test). Runs on every push and PR.
+- **`e2e`** - `mvn verify -Pe2e -pl e2e-tests -am` (builds the 3 Docker images, runs the whole
+  stack). Only on pushes to `main` (not on PRs) since it's noticeably slower/heavier.
+
 ## Possible follow-ups (not implemented, out of scope for this PoC)
 
 - Flyway/Liquibase migrations instead of `hibernate.ddl-auto=update`.
