@@ -33,6 +33,13 @@
         <java.version>25</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <testcontainers.version>1.21.3</testcontainers.version>
+        <sonar.maven.plugin.version>5.1.0.4751</sonar.maven.plugin.version>
+        <jacoco.maven.plugin.version>0.8.13</jacoco.maven.plugin.version>
+        <sonar.projectKey>payment-compliance-saga-orchestrator</sonar.projectKey>
+        <sonar.projectName>Payment Compliance Saga Orchestrator</sonar.projectName>
+        <sonar.exclusions>**/target/**,**/generated-sources/**</sonar.exclusions>
+        <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+        <sonar.host.url>http://localhost:9000</sonar.host.url>
     </properties>
 
     <dependencyManagement>
@@ -46,5 +53,43 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <build>
+        <!-- In <plugins> (not <pluginManagement>), inherited and bound in every module so
+             `mvn test`/`mvn verify` always records coverage before Sonar analysis reads it. -->
+        <plugins>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.maven.plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>jacoco-prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>jacoco-report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+        <pluginManagement>
+            <plugins>
+                <!-- Declared here (parent, not per-module) so `mvn sonar:sonar` run once from
+                     the root aggregates all 4 modules into one Sonar project. -->
+                <plugin>
+                    <groupId>org.sonarsource.scanner.maven</groupId>
+                    <artifactId>sonar-maven-plugin</artifactId>
+                    <version>${sonar.maven.plugin.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 
 </project>
