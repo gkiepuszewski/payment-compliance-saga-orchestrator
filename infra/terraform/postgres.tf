@@ -3,6 +3,15 @@ resource "docker_volume" "postgres_data" {
   name     = "payment-compliance-saga-${each.key}-pgdata"
 }
 
+# Each service's DB password, read from the same Vault KV v2 secret that
+# infra/vault/seed-secrets.sh seeds and that VaultEnvironmentPostProcessor reads at application
+# startup - Vault is the single source of truth for every DB password in this repo.
+data "vault_kv_secret_v2" "db_password" {
+  for_each = var.databases
+  mount    = "secret"
+  name     = each.value.secret_path
+}
+
 resource "docker_container" "postgres" {
   for_each = var.databases
 
@@ -13,7 +22,7 @@ resource "docker_container" "postgres" {
   env = [
     "POSTGRES_DB=${each.value.db_name}",
     "POSTGRES_USER=${each.value.username}",
-    "POSTGRES_PASSWORD=${each.value.password}",
+    "POSTGRES_PASSWORD=${data.vault_kv_secret_v2.db_password[each.key].data["db_password"]}",
   ]
 
   ports {

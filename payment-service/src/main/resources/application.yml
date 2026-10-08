@@ -9,8 +9,12 @@ spring:
       enabled: true
   datasource:
     url: jdbc:postgresql://localhost:5433/payment_db
-    username: payment
-    password: payment
+    username: ${DB_USERNAME:payment}
+    # Password is intentionally absent here: VaultEnvironmentPostProcessor injects
+    # spring.datasource.password at startup by fetching it from the local Vault dev server
+    # (see README > "Secrets management"). No placeholder/default is defined, so if Vault is
+    # unreachable the datasource simply fails to connect with a clear error, rather than silently
+    # falling back to a hard-coded value.
   jpa:
     hibernate:
       ddl-auto: validate

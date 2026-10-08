@@ -10,12 +10,70 @@ version: "3.9"
 #   -d '{"payerId":"alice","payeeId":"bob","amount":100,"currency":"EUR"}'
 
 services:
+  # Ephemeral, in-memory Vault dev server: the single source of truth for every DB password used
+  # below (Postgres bootstrap + each Spring service's own datasource password). Wiped on every
+  # restart, never reachable outside this compose network - see README > "Secrets management".
+  vault:
+    image: hashicorp/vault:1.18
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: dev-only-root-token # NOSONAR: fixed root token for the local, ephemeral `vault -dev` server only - see README > "Secrets management"
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      VAULT_ADDR: http://127.0.0.1:8200 # needed so the `vault status` healthcheck's CLI call below doesn't default to https
+    cap_add:
+      - IPC_LOCK
+    ports:
+      - "8200:8200"
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-shot: seeds the demo DB passwords into Vault. Safe to commit (see infra/vault/seed-secrets.sh).
+  vault-seed:
+    image: hashicorp/vault:1.18
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: dev-only-root-token # NOSONAR: see vault service above
+    entrypoint: ["/bin/sh", "/scripts/seed-secrets.sh"]
+    volumes:
+      - ./infra/vault/seed-secrets.sh:/scripts/seed-secrets.sh:ro
+    depends_on:
+      vault:
+        condition: service_healthy
+    restart: "no"
+
+  # One-shot: reads each service's DB password back out of Vault and writes it to a shared,
+  # read-only volume, so the postgres-* containers below can bootstrap via POSTGRES_PASSWORD_FILE
+  # without ever having the password passed as a plain environment variable or baked into this file.
+  vault-fetch-passwords:
+    image: hashicorp/vault:1.18
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: dev-only-root-token # NOSONAR: see vault service above
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      vault kv get -field=db_password secret/payment-service > /secrets/payment_password &&
+      vault kv get -field=db_password secret/compliance-service > /secrets/compliance_password &&
+      vault kv get -field=db_password secret/orchestrator-service > /secrets/orchestrator_password
+    volumes:
+      - vault-secrets:/secrets
+    depends_on:
+      vault-seed:
+        condition: service_completed_successfully
+    restart: "no"
+
   postgres-payment:
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: payment_db
       POSTGRES_USER: payment
-      POSTGRES_PASSWORD: payment
+      POSTGRES_PASSWORD_FILE: /run/secrets/payment_password
+    volumes:
+      - vault-secrets:/run/secrets:ro
+    depends_on:
+      vault-fetch-passwords:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U payment -d payment_db"]
       interval: 5s
@@ -27,7 +85,12 @@ services:
     environment:
       POSTGRES_DB: compliance_db
       POSTGRES_USER: compliance
-      POSTGRES_PASSWORD: compliance
+      POSTGRES_PASSWORD_FILE: /run/secrets/compliance_password
+    volumes:
+      - vault-secrets:/run/secrets:ro
+    depends_on:
+      vault-fetch-passwords:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U compliance -d compliance_db"]
       interval: 5s
@@ -39,7 +102,12 @@ services:
     environment:
       POSTGRES_DB: orchestrator_db
       POSTGRES_USER: orchestrator
-      POSTGRES_PASSWORD: orchestrator
+      POSTGRES_PASSWORD_FILE: /run/secrets/orchestrator_password
+    volumes:
+      - vault-secrets:/run/secrets:ro
+    depends_on:
+      vault-fetch-passwords:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U orchestrator -d orchestrator_db"]
       interval: 5s
@@ -54,10 +122,15 @@ services:
       - "8081:8081"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-payment:5432/payment_db
-      APP_ORCHESTRATOR_INBOX_URL: http://orchestrator-service:8080/api/sagas/events
+      SPRING_DATASOURCE_USERNAME: payment
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: dev-only-root-token # NOSONAR: see vault service above
+      APP_ORCHESTRATOR_URL: http://orchestrator-service:8080/api/sagas/events
     depends_on:
       postgres-payment:
         condition: service_healthy
+      vault-seed:
+        condition: service_completed_successfully
 
   compliance-service:
     build:
@@ -67,10 +140,15 @@ services:
       - "8082:8082"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-compliance:5432/compliance_db
-      APP_ORCHESTRATOR_INBOX_URL: http://orchestrator-service:8080/api/sagas/events
+      SPRING_DATASOURCE_USERNAME: compliance
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: dev-only-root-token # NOSONAR: see vault service above
+      APP_ORCHESTRATOR_URL: http://orchestrator-service:8080/api/sagas/events
     depends_on:
       postgres-compliance:
         condition: service_healthy
+      vault-seed:
+        condition: service_completed_successfully
 
   orchestrator-service:
     build:
@@ -80,8 +158,16 @@ services:
       - "8080:8080"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-orchestrator:5432/orchestrator_db
-      APP_PAYMENT_SERVICE_INBOX_URL: http://payment-service:8081/api/payments/confirmation
-      APP_COMPLIANCE_SERVICE_INBOX_URL: http://compliance-service:8082/api/compliance/screening
+      SPRING_DATASOURCE_USERNAME: orchestrator
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: dev-only-root-token # NOSONAR: see vault service above
+      APP_PAYMENT_SERVICE_URL: http://payment-service:8081/api/payments/confirmation
+      APP_COMPLIANCE_SERVICE_URL: http://compliance-service:8082/api/compliance/screening
     depends_on:
       postgres-orchestrator:
         condition: service_healthy
+      vault-seed:
+        condition: service_completed_successfully
+
+volumes:
+  vault-secrets:

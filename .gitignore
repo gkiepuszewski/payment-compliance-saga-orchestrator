@@ -38,3 +38,6 @@ infra/terraform/terraform.tfstate
 infra/terraform/terraform.tfstate.backup
 infra/terraform/*.tfvars
 **/tree.txt
+
+### Secrets ###
+.env
