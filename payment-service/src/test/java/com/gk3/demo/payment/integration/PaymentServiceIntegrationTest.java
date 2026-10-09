@@ -68,7 +68,16 @@ class PaymentServiceIntegrationTest {
     @Autowired
     private InboxRepository inboxRepository;
 
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            // Plain HTTP (no TLS) with the default client otherwise still attempts an HTTP/1.1 ->
+            // h2c upgrade handshake, which involves extra selector/timer bookkeeping. On CPU-
+            // constrained CI runners (e.g. GitHub Actions' 2-vCPU ubuntu-latest) that extra
+            // machinery has been observed to trigger a known JDK HttpClient race where
+            // HttpClient.send() spuriously throws InterruptedException even though nothing in our
+            // code ever interrupts the test thread. Forcing HTTP/1.1 avoids the upgrade path
+            // entirely; sendWithRetry() below is a second line of defense in case it still occurs.
+            .version(HttpClient.Version.HTTP_1_1)
+            .build();
 
     @BeforeEach
     void stubOrchestrator() {
@@ -145,7 +154,21 @@ class PaymentServiceIntegrationTest {
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
                 .build();
-        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        return sendWithRetry(request);
+    }
+
+    /**
+     * Retries once on {@link InterruptedException}: a known, spurious JDK HttpClient race (not
+     * caused by anything in our code) that surfaces intermittently on CPU-constrained CI runners.
+     * See the {@code httpClient} field javadoc above for details.
+     */
+    private HttpResponse<String> sendWithRetry(HttpRequest request) throws Exception {
+        try {
+            return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        } catch (InterruptedException _) {
+            Thread.interrupted(); // clear the stale interrupt flag before retrying
+            return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        }
     }
 
     private static UUID extractId(String jsonBody) {
