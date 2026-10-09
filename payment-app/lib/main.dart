@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'screens/payments_list_screen.dart';
+import 'theme.dart';
 
 void main() {
   runApp(const PaymentApp());
@@ -13,7 +14,10 @@ class PaymentApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Payment App',
-      theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo)),
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: ThemeMode.system,
       home: const PaymentsListScreen(),
     );
   }
