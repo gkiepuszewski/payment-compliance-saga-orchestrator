@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/payment.dart';
+import 'payment_status_style.dart';
 
 /// Read-only card showing a payment's current state. Reused both by the
 /// "View" screen and by the result view shown right after submitting a new
@@ -12,24 +13,33 @@ class PaymentStatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final style = paymentStatusStyle(payment.status);
     return Card(
       margin: const EdgeInsets.all(16),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  '${payment.amount} ${payment.currency}',
-                  style: Theme.of(context).textTheme.headlineSmall,
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: style.color.withValues(alpha: 0.15),
+                  foregroundColor: style.color,
+                  child: Icon(style.icon, size: 26),
                 ),
-                _StatusChip(status: payment.status),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    '${payment.amount} ${payment.currency}',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                ),
+                _StatusChip(style: style),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 20),
             _DetailRow(label: 'Payment ID', value: payment.id),
             _DetailRow(label: 'Payer', value: payment.payerId),
             _DetailRow(label: 'Payee', value: payment.payeeId),
@@ -60,7 +70,7 @@ class _DetailRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -76,21 +86,16 @@ class _DetailRow extends StatelessWidget {
 }
 
 class _StatusChip extends StatelessWidget {
-  final PaymentStatus status;
+  final PaymentStatusStyle style;
 
-  const _StatusChip({required this.status});
+  const _StatusChip({required this.style});
 
   @override
   Widget build(BuildContext context) {
-    final (label, color) = switch (status) {
-      PaymentStatus.pending => ('PENDING', Colors.orange),
-      PaymentStatus.confirmed => ('CONFIRMED', Colors.green),
-      PaymentStatus.cancelled => ('CANCELLED', Colors.red),
-      PaymentStatus.unknown => ('UNKNOWN', Colors.grey),
-    };
     return Chip(
-      label: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-      backgroundColor: color,
+      avatar: Icon(style.icon, color: Colors.white, size: 18),
+      label: Text(style.label),
+      backgroundColor: style.color,
     );
   }
 }

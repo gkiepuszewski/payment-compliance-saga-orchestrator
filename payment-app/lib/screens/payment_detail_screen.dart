@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api/payment_api_client.dart';
 import '../models/payment.dart';
+import '../widgets/centered_content.dart';
 import '../widgets/payment_status_card.dart';
 
 /// Shows the current status of a single payment, fetched fresh from
@@ -80,64 +81,81 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Payment status')),
-      body: Column(
-        children: [
-          Expanded(
-            child: _loading && _payment == null
-                ? const Center(child: CircularProgressIndicator())
-                : _error != null && _payment == null
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(
-                            _error!,
-                            style: const TextStyle(color: Colors.red),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      )
-                    : ListView(
-                        children: [
-                          if (_payment != null) PaymentStatusCard(payment: _payment!),
-                          if (_error != null)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 24),
-                              child: Text(
-                                _error!,
-                                style: const TextStyle(color: Colors.red),
-                                textAlign: TextAlign.center,
+      body: SafeArea(
+        child: CenteredContent(
+          child: Column(
+            children: [
+              Expanded(
+                child: _loading && _payment == null
+                    ? const Center(child: CircularProgressIndicator())
+                    : _error != null && _payment == null
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.cloud_off_rounded,
+                                    size: 64,
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    _error!,
+                                    textAlign: TextAlign.center,
+                                    style: Theme.of(context).textTheme.bodyLarge,
+                                  ),
+                                ],
                               ),
                             ),
-                        ],
-                      ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Back'),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: _loading ? null : _refresh,
-                    child: _loading
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text('Refresh'),
-                  ),
+                        : ListView(
+                            children: [
+                              if (_payment != null) PaymentStatusCard(payment: _payment!),
+                              if (_error != null)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                                  child: Text(
+                                    _error!,
+                                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                            ],
+                          ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.arrow_back_rounded),
+                        label: const Text('Back'),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: _loading ? null : _refresh,
+                        icon: _loading
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Icon(Icons.refresh_rounded),
+                        label: const Text('Refresh'),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

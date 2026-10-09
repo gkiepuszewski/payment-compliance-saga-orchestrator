@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api/payment_api_client.dart';
 import '../models/payment.dart';
+import '../widgets/centered_content.dart';
 import '../widgets/payment_status_card.dart';
 
 /// New payment form. On successful submit, the form is replaced in-place by
@@ -99,33 +100,62 @@ class _PaymentFormScreenState extends State<PaymentFormScreen> {
     final result = _result;
     return Scaffold(
       appBar: AppBar(title: Text(result == null ? 'New payment' : 'Payment submitted')),
-      body: result == null ? _buildForm() : _buildResult(result),
+      body: SafeArea(
+        child: CenteredContent(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 0.04),
+                  end: Offset.zero,
+                ).animate(animation),
+                child: child,
+              ),
+            ),
+            child: result == null
+                ? _buildForm(key: const ValueKey('form'))
+                : _buildResult(result, key: const ValueKey('result')),
+          ),
+        ),
+      ),
     );
   }
 
-  Widget _buildForm() {
+  Widget _buildForm({required Key key}) {
     return Form(
       key: _formKey,
       child: ListView(
+        key: key,
         padding: const EdgeInsets.all(16),
         children: [
           TextFormField(
             controller: _payerIdController,
-            decoration: const InputDecoration(labelText: 'Payer ID'),
+            decoration: const InputDecoration(
+              labelText: 'Payer ID',
+              prefixIcon: Icon(Icons.person_outline_rounded),
+            ),
             validator: (value) =>
                 (value == null || value.trim().isEmpty) ? 'Payer ID is required' : null,
           ),
           const SizedBox(height: 12),
           TextFormField(
             controller: _payeeIdController,
-            decoration: const InputDecoration(labelText: 'Payee ID'),
+            decoration: const InputDecoration(
+              labelText: 'Payee ID',
+              prefixIcon: Icon(Icons.person_pin_circle_outlined),
+            ),
             validator: (value) =>
                 (value == null || value.trim().isEmpty) ? 'Payee ID is required' : null,
           ),
           const SizedBox(height: 12),
           TextFormField(
             controller: _amountController,
-            decoration: const InputDecoration(labelText: 'Amount'),
+            decoration: const InputDecoration(
+              labelText: 'Amount',
+              prefixIcon: Icon(Icons.payments_outlined),
+            ),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             validator: (value) {
               final parsed = double.tryParse((value ?? '').trim());
@@ -138,7 +168,10 @@ class _PaymentFormScreenState extends State<PaymentFormScreen> {
           const SizedBox(height: 12),
           TextFormField(
             controller: _currencyController,
-            decoration: const InputDecoration(labelText: 'Currency (ISO 4217, e.g. USD)'),
+            decoration: const InputDecoration(
+              labelText: 'Currency (ISO 4217, e.g. USD)',
+              prefixIcon: Icon(Icons.currency_exchange_rounded),
+            ),
             maxLength: 3,
             textCapitalization: TextCapitalization.characters,
             validator: (value) =>
@@ -146,26 +179,31 @@ class _PaymentFormScreenState extends State<PaymentFormScreen> {
           ),
           if (_submitError != null) ...[
             const SizedBox(height: 8),
-            Text(_submitError!, style: const TextStyle(color: Colors.red)),
+            Text(
+              _submitError!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
           ],
           const SizedBox(height: 16),
-          FilledButton(
+          FilledButton.icon(
             onPressed: _submitting ? null : _submit,
-            child: _submitting
+            icon: _submitting
                 ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                   )
-                : const Text('Submit payment'),
+                : const Icon(Icons.send_rounded),
+            label: const Text('Submit payment'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildResult(Payment payment) {
+  Widget _buildResult(Payment payment, {required Key key}) {
     return Column(
+      key: key,
       children: [
         Expanded(
           child: ListView(
@@ -177,22 +215,24 @@ class _PaymentFormScreenState extends State<PaymentFormScreen> {
           child: Row(
             children: [
               Expanded(
-                child: OutlinedButton(
+                child: OutlinedButton.icon(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Back'),
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  label: const Text('Back'),
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: FilledButton(
+                child: FilledButton.icon(
                   onPressed: _refreshing ? null : _refreshResult,
-                  child: _refreshing
+                  icon: _refreshing
                       ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
-                      : const Text('Refresh'),
+                      : const Icon(Icons.refresh_rounded),
+                  label: const Text('Refresh'),
                 ),
               ),
             ],
