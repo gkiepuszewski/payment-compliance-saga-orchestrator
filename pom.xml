@@ -78,6 +78,30 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- Resolves the mockito-core jar path into a property so it can be loaded as a
+                 static -javaagent below. Without this, Mockito's inline mock maker falls back
+                 to self-attaching at runtime, which some CI environments (e.g. GitHub Actions
+                 Ubuntu runners) block, causing "Could not initialize plugin: MockMaker". -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>resolve-mockito-agent</id>
+                        <phase>generate-test-resources</phase>
+                        <goals>
+                            <goal>properties</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar}</argLine>
+                </configuration>
+            </plugin>
         </plugins>
         <pluginManagement>
             <plugins>
