@@ -28,9 +28,100 @@ payment-service/        :8081  Owns Payment aggregate + its own Postgres DB (pay
 compliance-service/     :8082  Simulated AML/sanctions screening + its own Postgres DB (compliance_db)
 orchestrator-service/   :8080  Saga state machine + its own Postgres DB (orchestrator_db)
 infra/terraform/        Spins up 3 local PostgreSQL containers via the Docker provider
+e2e-tests/              Opt-in black-box saga tests driving the whole Dockerized stack
+```
+
+```mermaid
+flowchart LR
+    Client(["Client"])
+
+    subgraph PS["payment-service :8081"]
+        PAPI["PaymentController<br/>/api/payments"]
+        PCONF["PaymentConfirmationController<br/>/api/payments/confirmation (Inbox)"]
+        POUT(["OutboxRelay"])
+        PDB[("payment_db")]
+    end
+
+    subgraph OS["orchestrator-service :8080"]
+        OIN["OrchestratorController<br/>/api/sagas/events (Inbox)"]
+        OSAGA["SagaOrchestrationService"]
+        OOUT(["OutboxRelay"])
+        ODB[("orchestrator_db")]
+    end
+
+    subgraph CS["compliance-service :8082"]
+        CIN["ComplianceController<br/>/api/compliance/screening (Inbox)"]
+        CSCREEN["ScreeningService"]
+        COUT(["OutboxRelay"])
+        CDB[("compliance_db")]
+    end
+
+    Vault[("HashiCorp Vault<br/>dev server :8200")]
+
+    Client --> PAPI
+    PAPI --> PDB
+    POUT -->|"PaymentCreated"| OIN
+    OOUT -->|"ScreenPaymentCommand"| CIN
+    COUT -->|"PaymentScreened"| OIN
+    OOUT -->|"Confirm/CancelPaymentCommand"| PCONF
+    PCONF --> PDB
+    OIN --> OSAGA --> ODB
+    CIN --> CSCREEN --> CDB
+    Vault -.->|"DB password at startup"| PS
+    Vault -.->|"DB password at startup"| OS
+    Vault -.->|"DB password at startup"| CS
 ```
 
 ## Saga flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client
+    participant PS as payment-service
+    participant OS as orchestrator-service
+    participant CS as compliance-service
+
+    Client->>PS: POST /api/payments
+    activate PS
+    PS->>PS: Save Payment (PENDING) + PaymentCreated row in Outbox (same tx)
+    PS-->>Client: 201 Created
+    deactivate PS
+
+    PS->>OS: [Outbox relay] PaymentCreated -> POST /api/sagas/events
+    activate OS
+    OS->>OS: SagaInstance STARTED -> AWAITING_SCREENING + ScreenPaymentCommand in Outbox
+    deactivate OS
+
+    OS->>CS: [Outbox relay] ScreenPaymentCommand -> POST /api/compliance/screening
+    activate CS
+    CS->>CS: Screen payer/payee against sanctions list
+    deactivate CS
+
+    alt Approved
+        CS->>OS: [Outbox relay] PaymentScreened(APPROVED) -> POST /api/sagas/events
+        OS->>OS: Saga -> COMPLETED + ConfirmPaymentCommand in Outbox
+        OS->>PS: [Outbox relay] ConfirmPaymentCommand -> POST /api/payments/confirmation
+        PS->>PS: Payment PENDING -> CONFIRMED
+    else Rejected
+        CS->>OS: [Outbox relay] PaymentScreened(REJECTED) -> POST /api/sagas/events
+        OS->>OS: Saga -> COMPENSATED + CancelPaymentCommand in Outbox
+        OS->>PS: [Outbox relay] CancelPaymentCommand -> POST /api/payments/confirmation
+        PS->>PS: Payment PENDING -> CANCELLED (compensation)
+    end
+```
+
+The orchestrator's `SagaInstance` (keyed by `paymentId`) walks through exactly these states:
+
+```mermaid
+stateDiagram-v2
+    [*] --> STARTED: PaymentCreated received
+    STARTED --> AWAITING_SCREENING: ScreenPaymentCommand sent
+    AWAITING_SCREENING --> COMPLETED: PaymentScreened(APPROVED)\nConfirmPaymentCommand sent
+    AWAITING_SCREENING --> COMPENSATED: PaymentScreened(REJECTED)\nCancelPaymentCommand sent
+    COMPLETED --> [*]
+    COMPENSATED --> [*]
+```
 
 ```
 1. POST /api/payments (payment-service)
@@ -63,6 +154,28 @@ receives the saga's final Confirm/Cancel decision). The receiving Inbox persists
 processing, so redelivery after a timeout/5xx is always safe to retry.
 
 ## Reliable messaging: Outbox/Inbox, not a broker
+
+```mermaid
+flowchart TB
+    subgraph Sender["Sender service - single local transaction"]
+        A["Update business entity<br/>e.g. Payment -&gt; PENDING"] --> B["Insert outbox row<br/>status = PENDING"]
+    end
+    B --> C(["@Scheduled OutboxRelay<br/>polls PENDING rows"])
+    C -->|"HTTP POST EventEnvelope"| D{"Receiver response"}
+    D -->|"2xx"| E["Mark outbox row SENT"]
+    D -->|"non-2xx / exception"| F{"attempts &lt; max-attempts?"}
+    F -->|"yes"| C
+    F -->|"no"| G["Mark outbox row FAILED<br/>(dead-letter, needs manual replay)"]
+
+    subgraph Receiver["Receiver service"]
+        H["Inbox endpoint"] --> I{"messageId already<br/>in inbox_messages?"}
+        I -->|"yes - duplicate"| J["No-op, return 200 OK"]
+        I -->|"no"| K["Insert InboxMessage RECEIVED<br/>(same local transaction)"]
+        K --> L["Dispatch to domain logic"]
+        L --> M["Mark InboxMessage PROCESSED"]
+    end
+    D -.-> H
+```
 
 - **Outbox**: writing the business state change (e.g. `Payment` -> PENDING) and the outgoing event
   row happen in the *same local database transaction* — either both commit or neither does.
@@ -208,7 +321,5 @@ mvn verify -Pe2e -pl e2e-tests -am
 
 ## Possible follow-ups (not implemented, out of scope for this PoC)
 
-- Flyway/Liquibase migrations instead of `hibernate.ddl-auto=update`.
-- A scheduled reaper to alert/replay `FAILED` outbox rows.
 - A Kubernetes manifest for the 3 services' existing Dockerfiles, to show the orchestrator running
   unchanged outside this Terraform/local-JVM setup.
