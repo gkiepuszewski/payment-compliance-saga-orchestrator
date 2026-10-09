@@ -61,6 +61,16 @@
             <version>2.0.17</version>
             <scope>test</scope>
         </dependency>
+        <!-- Not used directly here (no mocks in black-box e2e tests) - but spring-boot-starter-
+             parent unconditionally injects "-javaagent:${org.mockito:mockito-core:jar}" into every
+             module's surefire argLine (for Mockito's inline mock maker). Without this dependency,
+             that property never resolves, and the literal unresolved placeholder gets passed as
+             the -javaagent path, crashing the forked test JVM before it can even start. -->
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
