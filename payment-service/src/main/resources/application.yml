@@ -26,6 +26,11 @@ spring:
 app:
   orchestrator:
     url: http://localhost:8080/api/sagas/events
+  cors:
+    # Browsers (e.g. payment-app running via `flutter run -d chrome`) enforce CORS; plain
+    # server-to-server calls (orchestrator-service, curl, the e2e tests) are unaffected and need
+    # no entry here. Comma-separated origin patterns, see CorsRegistration#allowedOriginPatterns.
+    allowed-origins: http://localhost:*,http://127.0.0.1:*
 
 outbox:
   relay:

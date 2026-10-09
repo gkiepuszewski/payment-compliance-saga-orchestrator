@@ -29,6 +29,7 @@ compliance-service/     :8082  Simulated AML/sanctions screening + its own Postg
 orchestrator-service/   :8080  Saga state machine + its own Postgres DB (orchestrator_db)
 infra/terraform/        Spins up 3 local PostgreSQL containers via the Docker provider
 e2e-tests/              Opt-in black-box saga tests driving the whole Dockerized stack
+payment-app/            Flutter client (Windows/Linux desktop + web) to submit a payment and poll its status
 ```
 
 ```mermaid
@@ -292,6 +293,61 @@ Invoke-RestMethod "http://localhost:8080/api/sagas/$($p.id)"      # state: COMPE
 ```bash
 cd infra/terraform && terraform destroy -auto-approve
 ```
+
+## Flutter client (`payment-app`)
+
+A desktop/web GUI for `payment-service`, independent of the Maven reactor (own `pubspec.yaml`,
+built via the Flutter SDK). One screen lists payments (newest first, via
+`GET /api/payments?sort=createdAt,desc`); a "New payment" button opens a form that `POST`s a
+payment and then shows its (initially `PENDING`) status in place, with "Refresh" (re-fetches via
+`GET /api/payments/{id}`) and "Back" buttons. Pressing "View" on a list row opens the same
+status view for an existing payment. The list auto-refreshes whenever you return from that form
+(new payment or "Back"), but otherwise never polls - an individual payment's status is only
+re-checked when the user presses "Refresh", by design (the saga resolves asynchronously, so a
+live-updating status view would just add noise for a PoC).
+
+```bash
+cd payment-app
+flutter pub get
+flutter run -d windows   # or: -d linux / -d chrome
+```
+
+By default it talks to `payment-service` at `http://localhost:8081` (see "Running locally"
+above to start the full stack). Override at run/build time without touching source:
+
+```bash
+flutter run -d windows --dart-define=PAYMENT_SERVICE_BASE_URL=http://localhost:8081
+```
+
+### Running on web
+
+Works on any OS, including this Windows machine - no Linux needed:
+
+```bash
+flutter run -d chrome
+```
+
+Or build a static bundle for deployment, served by any HTTP server:
+
+```bash
+flutter build web
+# output in payment-app/build/web
+```
+
+### Running on Linux desktop
+
+Requires an actual Linux machine or WSL2 - a Linux binary can't be built from Windows directly.
+One-time setup on the Linux side, then same commands as above:
+
+```bash
+sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev
+
+cd payment-app
+flutter pub get
+flutter run -d linux
+```
+
+Use `flutter devices` to see which targets Flutter detects in the current environment.
 
 ## End-to-end tests
 
